@@ -1,16 +1,5 @@
-CONTRIBUTIONS 
-Alexander Earl
--> Custom User Model/Admin, Sign In/Sign Up, Filtering, Profile Page, Similar Hobbies
-Bishes Limbu
--> Custom User Model/Admin, Sign In/Sign Up, Filtering, Similar Hobbies, Profile Page
-Samuele Joshi
--> Friend Requests, Friends, Hobbies List, Similar Hobbies
-Yat Syn Chan
--> Friend Requests, Friends, Hobbies List, Similar Hobbies
 
-
-URL -> https://group30-2021-group30-2021.apps.kube.eecs.qmul.ac.uk/
-
+# DJANGO EMPLOYEE WEB PORTAL
 
 ADMIN ACCOUNT:
 Username: admin
