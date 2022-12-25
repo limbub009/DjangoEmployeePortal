@@ -1,0 +1,104 @@
+{% extends 'hobbies/base.html' %}
+{% block content %}
+<div id="app">
+    <div class="container" v-if="user && friends">
+        {% csrf_token %}
+        <div style="text-align: right"><a href="{% url 'logout'%}" >Logout</a></div>
+
+        <div class="row">
+            <div class="col-12">
+                <table class="table">
+                    <tr>
+                        <td>Current Requests</td>
+                    </tr>
+                    <tr v-for="request in friends.received">
+                        <td>[[request.username]]</td>
+                        <td>
+                            <button class="btn btn-small btn-primary" @click="accept(request)">Accept</button>
+                            <button class="btn btn-small btn-primary" @click="decline(request)">Decline</button>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        <h1>My Friends:</h1>
+        <div class="row">
+            <div class="col-12">
+                <table class="table">
+                    <tr v-for="re in friends.friends">
+                        <td>[[re.username]]</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+    let myApp = Vue.createApp({
+        delimiters: ["[[", "]]"],
+        data() {
+            return {
+                user: false,
+                friends: [],
+            }
+        },
+        async created() {
+            let response = await fetch("{% url 'user api' %}");
+            let response2 = await fetch("{% url 'get_friends_api' %}");
+
+            if (response.ok) {
+                let data = await response.json();
+                this.user = data.users[0];
+            } else {
+                alert("failed to load user");
+            }
+
+            if(response2.ok){
+              let data2 = await response2.json();
+              this.friends = data2;
+            }
+            else{
+                alert("failed to load friend requests");
+            }
+        },
+
+        methods: {
+            async accept(request) {
+                let response = await fetch(request.accept);
+
+                if (response.ok) {
+                    let data = await response.json();
+                    for(let i = 0; i < this.friends.received.length; i++) {
+                        if(this.friends.received[i].username === request.username) {
+                            this.friends.friends.push(request);
+                            this.friends.received.splice(i, 1);
+                            return;
+                        }
+                    }
+                } else {
+                    alert("Failed to accept.");
+                }
+            },
+            async decline(request) {
+                let response = await fetch(request.decline);
+
+                if (response.ok) {
+                    let data = await response.json();
+                    for(let i = 0; i < this.friends.received.length; i++) {
+                        if(this.friends.received[i].username === request.username) {
+                            this.friends.received.splice(i, 1);
+                            return;
+                        }
+                    }
+                } else {
+                    alert("Failed to decline.");
+                }
+            }
+        }
+    })
+    myApp.mount('#app')
+</script>
+{% endblock %}
+{% endblock %}

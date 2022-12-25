@@ -1,0 +1,238 @@
+{% extends 'hobbies/base.html' %}
+{% block content %}
+<div id="app">
+    <div class="container">
+            {% csrf_token %}
+            <div style="text-align: right">
+                <a href="{% url 'logout' %}">Logout</a>
+            </div>
+            <h4>Hello, {{ user }}</h4>
+            <div style = "text-align: center" >
+                <a href="{% url 'similar_users' %}">Similar Users</a>
+            </div>
+            <div style = "text-align: center" >
+                <a href="{% url 'requests' %}">Friend Requests</a>
+            </div>
+            <p style="text-align: center"><img  v-for = "u in users" class ="profile_pic" id="profile_pic" src = "{{request.user.profile_pic.url}}" height = "312" width = "312"></p>
+
+            <div style="text-align: center">
+                <input type="file" id="profile_pic_upload" @change="profilePicUpload()" name="profile_pic_upload" accept="image/png, image/jpeg">
+                <button v-if="selected_picture == true" @click="enableProfilePicSubmission()">Submit</button>
+            </div>
+            <div class="col-9" style="margin-left: auto; margin-right: auto;">
+                <table class="table table-striped table-bordered table-hover table-sm">
+                    <thead>
+                      <tr>
+                        <th scope ="col" colspan="2" class = "col text-center" >User Details</th>
+                      </tr>
+                    </thead>
+
+
+                    <tbody v-for = "u in users" class = "col text-center">
+                          <tr>
+                              <th scope="row">Email</th>
+                              <td>
+                                <input v-if="u.editing" type="email" id="email" step="1" v-model="u.email">
+                                <a v-else >[[ u.email ]]</a>
+                              </td>
+                          </tr>
+                          <tr>
+                              <th scope="row">Date of Birth</th>
+                              <td>
+                                <input v-if="u.editing" type="date" step="1" v-model="u.dob">
+                                <a v-else >[[ u.dob ]]</a>
+                              </td>
+                          </tr>
+                          <tr>
+                              <th scope="row">City</th>
+                              <td>
+                                  <input v-if="u.editing" type="text" v-model="u.city">
+                                  <a v-else >[[ u.city ]]</a>
+                              </td>
+                          </tr>
+                          <tr>
+                              <th scope="row">Hobbies</th>
+                              <td v-if="u.editing">
+                                  <div v-for="hobby in hobbies" class="checkboxes">
+                                      [[ hobby.name ]]
+                                      <input type="checkbox" class="checkbox" :id="hobby.id" :checked="u.hobbies.includes(hobby.id)">
+                                  </div>
+                              </td>
+                              <td v-else>
+                                  <p v-for="hobby_id in u.hobbies" >[[ findHobby(hobby_id) ]]</p>
+                              </td>
+                          </tr>
+                          <tr>
+                            <td colspan="2" class = "col text-center">
+                              <button v-if="!u.editing" @click="u.editing = true" class="btn btn-primary">Edit</button>
+                              <button v-else @click="updateUser(u)" class="btn btn-sm btn-success">Save</button>
+                            </td>
+                          </tr>
+                    </tbody>
+                  </table>
+            </div>
+
+
+
+<!-------------------- HOBBBY TABLE --------------------->
+            <div class="col-4" style="margin-left: auto; margin-right: auto;">
+            <table class="table table-striped table-bordered table-hover table-sm col text-center">
+                <thead>
+                  <th scope="col">Hobbies</th>
+                </thead>
+                <tbody  v-for = "hobby in hobbies">
+                  <td> [[ hobby.name ]] </td>
+                </tbody>
+              </table>
+            </div>
+
+        <div style="margin-left: auto; margin-right: auto;">
+              <h3> Add Hobby:</h3>
+              <label>Hobby Name: </label>
+              <input id = "hobbyname" type="text"><br><br>
+              <button @click="createHobby()" class="btn btn-sm btn-success">Create Hobby</button><p></p>
+        </div>
+
+
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+    let myApp = Vue.createApp({
+        delimiters: ["[[", "]]"],
+        data() {
+            return {
+                file: null,
+                selected_picture: false,
+
+                users: [],
+                hobbies: [],
+            }
+        },
+        async created() {
+            let response = await fetch("{% url 'user api' %}");
+            let response2 = await fetch("{% url 'hobbies' %}");
+
+            if (response.ok) {
+                let data = await response.json();
+                this.users = data.users;
+            } else {
+                alert("failed to load user");
+            }
+
+            if(response2.ok){
+              let data2 = await response2.json();
+              this.hobbies = data2.hobbies;
+            }
+            else{
+                alert("failed to load list of hobbies");
+            }
+        },
+
+        methods: {
+          findHobby(hobby_id) {
+              for (var i = 0; i <= this.hobbies.length; i++) {
+                  try{
+                      if (this.hobbies[i].id == hobby_id){
+                          let hobby = this.hobbies[i];
+                          return hobby.name;
+                      }
+                  }
+                  catch(e){
+                  }
+              }
+          },
+          profilePicUpload(){
+              let profile_pic_upload = document.getElementById("profile_pic_upload");
+              this.selected_picture = false;
+              if (profile_pic_upload.value != ""){
+                  this.selected_picture = true;
+              }
+          },
+          async enableProfilePicSubmission(){
+              var formData = new FormData();
+              formData.append('profile_pic', document.getElementById("profile_pic_upload").files[0]);
+              let response = await fetch("{% url 'update_profile_pic' %}", {
+                  method: 'POST', // Method itself
+                  headers: {
+                      "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value,
+                  },
+                  body: formData
+              });
+              if (response.ok) {
+                  // module was created
+                  let updated_pic = await response.json();
+                  this.users[0].profile_pic = updated_pic.profile_pic;
+                  document.getElementById('profile_pic').src = updated_pic.profile_pic;
+                  // this.hobbies.push(new_hobby);
+                  // document.getElementById('hobbyname').value = '';
+              }
+          },
+          async createHobby() {
+              let response = await fetch('create_hobby', {
+                  method: 'POST', // Method itself
+                  headers: {
+                      "contentType": "application/json",
+                      "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value,
+                  },
+                  body: JSON.stringify({
+                      name: document.getElementById('hobbyname').value,
+                  }) // We send data in JSON format
+              });
+              if (response.ok) {
+                  // module was created
+                  let new_hobby = await response.json();
+                  this.hobbies.push(new_hobby);
+                  document.getElementById('hobbyname').value = '';
+              }
+              else {
+                  alert("failed to create hobby");
+              }
+          },
+
+          async updateUser(u) {
+              let checkedBoxes = document.getElementsByClassName('checkboxes'); // consists of the divs that are outside the checkboxes.
+              let var1 = document.getElementsByClassName('checkbox'); // consists of the individual checkboxes.
+              let array = [] // array consisting of the module ids of the selected modules.
+              for (var i = 0; i < var1.length; i++) {
+                  if (var1[i].checked) {
+                      array.push(var1[i].id);
+                  }
+              }
+              let response = await fetch(u.api, {
+                  method: 'PUT', // Method itself
+                  body: JSON.stringify({
+                      username: u.username,
+                      email: u.email,
+                      dob: u.dob,
+                      city: u.city,
+                      hobbies: array,
+
+                  }), // We send data in JSON format
+                  headers: {
+                      "Content-Type": "application/json",
+                      "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value,
+                  },
+              });
+              if(response.ok){
+                  u.editing = false;
+                  let response2 = await fetch("{% url 'user api' %}")
+                  if(response2.ok){
+                    let data2 = await response2.json();
+                    this.users = data2.users;
+                  }
+                  else{
+                      alert("failed to load list of users");
+                  }
+              }
+              else{
+                  alert("failed to update user");
+              }
+          },
+  }//methods bracket
+})
+    myApp.mount('#app')
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,217 @@
+{% extends 'hobbies/base.html' %}
+{% block content %}
+<div id="app">
+    <div class="container">
+        {% csrf_token %}
+        <div v-for = 'u in user' class="col-4">
+                <h1> [[ user[0].username ]] </h1>
+                <p><b>Email:</b> [[ u.email ]]</p>
+                <p><b>Age:</b> [[ convertAge(u.dob) ]]</p>
+                <p><b>City:</b> [[ u.city ]]</p>
+                <p><b>Hobbies:</b></p>
+                <ul>
+                    <li v-for="hobby_id in u.hobbies" >[[ findHobby(hobby_id) ]]</li>
+                </ul>
+        </div>
+        <div id="filter">
+            <p>City: <input type='text' id="filter_city"></p>
+            <p>Min age: <input type = 'text' id="filter_min"></p>
+            <p>Max age: <input type = 'text' id="filter_max"></p>
+            <button @click="filter()">Update</button>
+            <button @click="reset()">Reset</button>
+        </div>
+        <h2>Users With Common Hobbies:</h2>
+        <div v-for = 'user in most_similar'>
+              <h5>[[ user.username ]]</h5>
+              <p>Age: [[ user.age ]] </p>
+              <p>City: [[ user.city ]] </p>
+              <br><p>[[ user.username ]]'s Hobbies:</p>
+
+              <span v-for="hobby_id in user.hobbies" >[[ findHobby(hobby_id) ]], </span><br><br><br>
+
+
+              <p>The common hobbies:</p>
+              <li v-for="hobby in user.common" >[[ hobby ]]</li><br>
+              <p>Total number of common hobbies: <b> [[ user.common.length ]] </b> </p>
+              <button v-if="isFriendOrSentFR(user) == false" class="btn btn-small btn-primary" @click="send(user)">Send Friend Request</button>
+              <p>----------------------------</p>
+        </div>
+
+    </div>
+</div>
+{% block scripts %}
+<script>
+    let myApp = Vue.createApp({
+        delimiters: ["[[", "]]"],
+        data() {
+            return {
+                file: null,
+                selected_picture: false,
+
+                user: [],
+                users: [],
+                hobbies: [],
+                most_similar: [],
+                friends: null,
+            }
+        },
+        async created() {
+            let response = await fetch("{% url 'user api' %}");
+            let response2 = await fetch("{% url 'users api' %}");
+            let response3 = await fetch("{% url 'hobbies' %}");
+            let response4 = await fetch("{% url 'get_friends_api' %}");
+
+            if (response.ok) {
+                let data = await response.json();
+                this.user = data.users;
+            } else {
+                alert("failed to load user");
+            }
+
+            if(response2.ok){
+                let data2 = await response2.json();
+                this.users = data2.users;
+            } else{
+                alert("failed to load users")
+            }
+
+            if(response3.ok){
+                let data3 = await response3.json();
+                this.hobbies = data3.hobbies;
+            }
+            else{
+                alert("failed to load list of hobbies")
+            }
+
+            if(response4.ok){
+              let data4 = await response4.json();
+              this.friends = data4;
+            }
+            else{
+              alert("failed to load friend requests");
+            }
+            // this.similarUsers()
+            this.filter();
+        },
+        methods: {
+          getCommonHobbies(user) {
+            let arr = [];
+
+            for(let i=0; i < this.user[0].hobbies.length; i++) {
+              for(let k=0; k < user.hobbies.length; k++) {
+                if(this.user[0].hobbies[i] == user.hobbies[k]) {
+                    arr.push(this.findHobby(this.user[0].hobbies[i]));
+                }
+              }
+            }
+
+            return arr;
+          },
+          findHobby(hobby_id) {
+              for (var i = 0; i <= this.hobbies.length; i++) {
+                  try{
+                      if (this.hobbies[i].id == hobby_id){
+                          let hobby = this.hobbies[i];
+                          return hobby.name;
+                      }
+                  }
+                  catch(e){
+                  }
+              }
+          },
+          convertAge(dateString) {
+              var today = new Date();
+              var birth_date = new Date(dateString);
+              var age = today.getFullYear() - birth_date.getFullYear();
+              var m = today.getMonth() - birth_date.getMonth();
+              if (m < 0 || (m === 0 && today.getDate() < birth_date.getDate())) {
+                  age--;
+              }
+              return age;
+            },
+          async filter() {
+              var filter_array = [];
+
+              var city = document.getElementById('filter_city').value.toLowerCase();
+
+              let min = document.getElementById('filter_min').value;
+              if (min == ""){min = 0;}
+              min = parseInt(min);
+
+
+              let max = document.getElementById('filter_max').value;
+              if (max == ""){max = 100;}
+              max = parseInt(max);
+
+              // go through all users.
+              for(var i=0; i < this.users.length; i++) {
+                var user2 = this.users[i];
+                user2.age = this.convertAge(user2.dob);
+                user2.common = this.getCommonHobbies(user2);
+
+                // if the checking username is not our user and the age is less or equal to the maximum age,
+                // and is greater than the minimum age, and the entered city is inside the city we want to check add the user.
+                if(user2.username != this.user[0].username && user2.age >= min && user2.age <= max && user2.city.toLowerCase().includes(city) && user2.common.length > 0) {
+                  filter_array.push(user2);
+                }
+              }
+
+
+              filter_array = filter_array.sort((a, b) => {
+                if(a.common.length > b.common.length) {
+                  return -1;
+                }
+
+                return 1;
+              });
+
+              this.most_similar = filter_array;
+          },
+          async send(request){
+              let response = await fetch(request.send_fr);
+              if (response.ok) {
+                let data = await response.json();
+                this.friends.sent.push(request);
+              }
+              else {
+                alert("Failed to send.");
+              }
+          },
+          isFriendOrSentFR(user) {
+            if(this.friends == null) {
+              return true;
+            }
+
+            for(let i=0;i<this.friends.friends.length;i++) {
+              if(this.friends.friends[i].username==user.username) {
+                return true;
+              }
+            }
+
+            for(let i=0;i<this.friends.sent.length;i++) {
+              if(this.friends.sent[i].username==user.username) {
+                return true;
+              }
+            }
+
+            for(let i=0;i<this.friends.received.length;i++) {
+              if(this.friends.received[i].username==user.username) {
+                return true;
+              }
+            }
+
+            return false;
+          },
+          reset(){
+            document.getElementById('filter_city').value = "";
+            document.getElementById('filter_min').value = "";
+            document.getElementById('filter_max').value = "";
+            //this.similarUsers();
+            this.filter();
+          }
+    } //methods bracket
+})
+    myApp.mount('#app')
+</script>
+{% endblock %}
+{% endblock %}
